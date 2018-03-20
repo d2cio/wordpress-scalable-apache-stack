@@ -1,0 +1,145 @@
+version: '1.0'
+services:
+  - name: db
+    type: mariadb
+    version: 10.3
+    configuration: MasterSlave
+    username: wordpress
+    # Ask password on create
+    userPassword: null
+    password: null
+    ports:
+      - 3306
+    remoteAccess: false
+    configFiles:
+      - dest: my.cnf
+        src: ./configs/my.cnf
+    comments:
+      username: Database will be created with the same name
+    deployTo:
+      - mainOne
+      - mainTwo
+
+  - name: cache
+    type: redis
+    version: 3.2
+    remoteAccess: false
+    ports:
+      - 6379
+    deployTo:
+      - edge
+
+  - name: blog
+    type: phpApache
+    version: 7.1
+    source:
+      type: download
+      url: https://wordpress.org/wordpress-4.9.4.zip
+    extensions:
+      - mysqli
+      - opcache
+      - gd
+      - zip
+      - soap
+    pecl:
+      - redis
+    ports:
+      - 80
+    remoteAccess: false
+    volumes:
+      - directory: $MAIN_PATH/wp-content/uploads
+        sync: true
+      - directory: $MAIN_PATH/wp-content/plugins
+        sync: true
+      - directory: $MAIN_PATH/wp-content/themes
+        sync: true
+    configFiles:
+      - dest: $MAIN_PATH/wp-config.php
+        src: ./configs/wp-config.php
+      - dest: $MAIN_PATH/db-config.php
+        src: ./configs/db-config.php
+      - dest: $MAIN_PATH/wp-content/db.php
+        src: ./configs/db.php
+      - dest: $MAIN_PATH/.htaccess
+        src: ./configs/.htaccess
+    globalDeps: |
+      apt-get install less mysql-client
+      curl https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar -o /usr/local/bin/wp
+      chmod +x /usr/local/bin/wp
+      echo 'wp() { su -p www-data -s /bin/sh -c "/usr/local/bin/wp $*"; }' >> ~/.bashrc
+      curl https://dl-ssl.google.com/dl/linux/direct/mod-pagespeed-stable_current_amd64.deb -o mod-pagespeed.deb
+      dpkg -i mod-pagespeed.deb
+      apt-get --yes --fix-broken install
+      a2enmod rewrite pagespeed
+      cp -r /var/www/blog/wp-content/themes ~/themes
+    localDeps: cp -r ~/themes/* /var/www/blog/wp-content/themes/
+    initialCommands: |
+      cd $MAIN_PATH
+      wp core install --url=$WP_URL --title=\"$WP_TITLE\" --admin_user=$WP_ADMIN_USERNAME --admin_password=$WP_ADMIN_PASSWORD --admin_email=$WP_ADMIN_EMAIL
+      wp plugin install redis-cache --activate
+      wp redis enable
+    env:
+      WP_URL: "{{=service('blog').getBalancerDomain()}}"
+      WP_TITLE: null
+      WP_ADMIN_USERNAME: null
+      WP_ADMIN_PASSWORD: null
+      WP_ADMIN_EMAIL: null
+    comments:
+      env:
+        WP_TITLE: The title of your Wordpress website
+        WP_ADMIN_USERNAME: Username of administrator account
+        WP_ADMIN_PASSWORD: Password of administrator account
+        WP_ADMIN_EMAIL: Email of administrator account
+    deployTo:
+      - mainOne
+      - mainTwo
+
+  - name: balancer
+    type: haproxy
+    version: latest
+    ports:
+      - 80
+      - 443
+    remoteAccess: true
+    serviceFiles:
+      - name: blog
+        sticky: true
+    deployTo:
+      - edge
+
+  - name: pma
+    type: phpApache
+    version: 7.1
+    remoteAccess: true
+    ports:
+      - 8080
+    source:
+      type: git
+      url: https://github.com/phpmyadmin/phpmyadmin
+      version: STABLE
+    extensions:
+      - mysqli
+      - opcache
+    configFiles:
+      - dest: $MAIN_PATH/config.inc.php
+        src: ./configs/config.inc.php
+    globalDeps: a2enmod rewrite
+    localDeps: composer install
+    deployTo:
+      - edge
+
+hosts:
+  - name: mainOne
+    requirements:
+      cores: 1
+      memory: 2
+
+  - name: mainTwo
+    requirements:
+      cores: 1
+      memory: 2
+
+  - name: edge
+    requirements:
+      cores: 1
+      memory: 1

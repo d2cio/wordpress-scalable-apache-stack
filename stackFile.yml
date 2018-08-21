@@ -18,8 +18,8 @@ services:
     comments:
       username: Database will be created with the same name
     deployTo:
-      - mainOne
-      - mainTwo
+      - main-one
+      - main-two
 
   - name: cache
     type: redis
@@ -82,8 +82,8 @@ services:
         WP_ADMIN_PASSWORD: Password of administrator account
         WP_ADMIN_EMAIL: Email of administrator account
     deployTo:
-      - mainOne
-      - mainTwo
+      - main-one
+      - main-two
 
   - name: balancer
     type: haproxy

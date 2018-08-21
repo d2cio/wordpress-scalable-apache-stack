@@ -119,12 +119,12 @@ services:
       - edge
 
 hosts:
-  - name: mainOne
+  - name: main-one
     requirements:
       cores: 1
       memory: 2
 
-  - name: mainTwo
+  - name: main-two
     requirements:
       cores: 1
       memory: 2

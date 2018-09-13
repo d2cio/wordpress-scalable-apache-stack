@@ -64,7 +64,9 @@ services:
       curl https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar -o /usr/local/bin/wp
       chmod +x /usr/local/bin/wp
       cp -r $MAIN_PATH/wp-content /var/www/wp-content-tmp
-    localDeps: cp -r /var/www/wp-content-tmp/* $MAIN_PATH/wp-content
+    localDeps: |
+      cp -r /var/www/wp-content-tmp/* $MAIN_PATH/wp-content
+      rm -rf /var/www/wp-content-tmp/
     initialCommands: |
       cd $MAIN_PATH
       wp core install --url={{=service('blog').getBalancerDomain()}} --title="$WP_TITLE" --admin_user=$WP_ADMIN_USERNAME --admin_password=$WP_ADMIN_PASSWORD --admin_email=$WP_ADMIN_EMAIL
